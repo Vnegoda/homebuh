@@ -6,7 +6,7 @@ uses
   System.SysUtils, System.Classes, OraCall, Data.DB, DBAccess, Ora;
 
 type
-  TDataModule1 = class(TDataModule)
+  TdmOra = class(TDataModule)
     OraSession: TOraSession;
   private
     { Private declarations }
@@ -15,7 +15,7 @@ type
   end;
 
 var
-  DataModule1: TDataModule1;
+  dmOra: TdmOra;
 
 implementation
 
