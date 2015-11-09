@@ -1,0 +1,13 @@
+﻿[ActionManager1]
+Coordinates=0,0,108,36
+
+[actExit]
+Coordinates=127,1,53,36
+
+[ActionMainMenuBar1]
+Coordinates=50,40,137,36
+Visible=True
+
+[]
+Coordinates=108,55,91,36
+

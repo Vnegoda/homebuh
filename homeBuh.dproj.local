@@ -1,14 +1,22 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.279,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.015,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.495,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.721,D:\!work\delphi\homebuh\Unit1.pas=D:\!work\delphi\homebuh\unSprValut.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.040,D:\!work\delphi\homebuh\Unit1.dfm=D:\!work\delphi\homebuh\unDM.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.505,D:\!work\delphi\homebuh\unInsUpdSprValut.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.793,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.721,D:\!work\delphi\homebuh\Unit1.dfm=D:\!work\delphi\homebuh\unSprValut.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.341,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.856,=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
-    <Transaction>2015.10.13 23:13:18.493,=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
-    <Transaction>2015.10.13 23:13:43.412,D:\!work\delphi\homebuh\unMain.dfm=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.dfm</Transaction>
-    <Transaction>2015.10.13 23:13:43.412,D:\!work\delphi\homebuh\unMain.pas=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
-    <Transaction>2015.10.13 23:13:52.847,D:\!work\delphi\homebuh\homeBuh.dproj=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Project1.dproj</Transaction>
-    <Transaction>2015.10.13 23:14:38.015,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
-    <Transaction>2015.10.13 23:15:40.793,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
-    <Transaction>2015.10.13 23:15:46.040,D:\!work\delphi\homebuh\unDM.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
-    <Transaction>2015.10.13 23:15:46.040,D:\!work\delphi\homebuh\unDM.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.412,C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.dfm=D:\!work\delphi\homebuh\unMain.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.412,C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas=D:\!work\delphi\homebuh\unMain.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.493,=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.899,=D:\!work\delphi\homebuh\unLoginForm.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.040,D:\!work\delphi\homebuh\Unit1.pas=D:\!work\delphi\homebuh\unDM.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.505,D:\!work\delphi\homebuh\unInsUpdSprValut.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.847,C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Project1.dproj=D:\!work\delphi\homebuh\homeBuh.dproj</Transaction>
   </Transactions>
 </BorlandProject>

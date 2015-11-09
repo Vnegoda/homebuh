@@ -20,10 +20,11 @@ type
     procedure edPasswordKeyPress(Sender: TObject; var Key: Char);
   private
     cntLogin:byte;   // количество попыток подключения
+    sLogin,sServeName:string;
     { Private declarations }
   public
   isConnected:Boolean;
-    { Public declarations }
+     { Public declarations }
   end;
 
 var
@@ -36,29 +37,31 @@ implementation
 uses unDm;
 
 procedure TfmLogin.bnOkClick(Sender: TObject);
-var sConnection:string;
+var
  Ini: Tinifile;
- sLogin,sServeName:string;
+
 begin
-  sLogin:='';
-  sServeName:='';
 
-   Ini:=TiniFile.Create(extractfilepath(paramstr(0))+'Config.ini');
-  sLogin:=trim(Ini.ReadString('Server','Login',''));
-  sServeName:= Trim( Ini.ReadString('Server','ServerName',''));
 
-  Ini.Free;
-  Self.edLogin.Text:=sLogin;
+  //Ini:=TiniFile.Create(extractfilepath(paramstr(0))+'Config.ini');
+//  sLogin:=trim(Ini.ReadString('Server','Login',''));
+
+
+ // Ini.Free;
+//  Self.edLogin.Text:=sLogin;
 //  sConnection:='Provider=SQLOLEDB.1;Persist Security Info=False;User ID=sa;Data Source=vova-pk;Use Procedure for Prepare=1;Auto Translate=True;Packet Size=4096;Workstation ID=VOVA-PK;Use Encryption for Data=False;Tag with column collation when possible=False;';
 //  sConnection:='Provider=SQLOLEDB.1;Persist Security Info=False;User ID='+sLogin+';Data Source='+sServeName+';Use Procedure for Prepare=1;Auto Translate=True;Packet Size=4096;Use Encryption for Data=False;Tag with column collation when possible=False;';
-   sConnection:='Provider=SQLOLEDB.1;Password='+Self.edPassword.Text+';Persist Security Info=True;User ID='+self.edLogin.Text+';Data Source='+sServeName;
+  // sConnection:='Provider=SQLOLEDB.1;Password='+Self.edPassword.Text+';Persist Security Info=True;User ID='+self.edLogin.Text+';Data Source='+sServeName;
 
 
-  dmOra.OraSession.ConnectionString :=  sConnection;
+  //dmOra.OraSession.ConnectionString :=  sConnection;
+   dmOra.OraSession.Server:=  trim(self.sServeName);
+   dmOra.OraSession.Username:=  trim(self.edLogin.Text);
+   dmOra.OraSession.Password:=trim(self.edPassword.Text);
 
  try
-  if not dm.AdoConnMain.Connected then
-    dm.AdoConnMain.Connected := true;
+  if not dmOra.OraSession.Connected then
+     dmOra.OraSession.Connected := true;
     Self.isConnected:=true;
  except
      if cntLogin<3 then
@@ -91,14 +94,27 @@ begin
 end;
 
 procedure TfmLogin.FormCreate(Sender: TObject);
+var
+ Ini: Tinifile;
+
 begin
   cntLogin:=1;
   SELF.isConnected:=FALSE;
   self.edLogin.Clear;
   self.edPassword.Clear;
 
-    self.edLogin.Text:='sa';
-  self.edPassword.Text:='111';
+
+  self.sLogin:='';
+  self.sServeName:='';
+
+   Ini:=TiniFile.Create(extractfilepath(paramstr(0))+'Config.ini');
+   self.sLogin:=trim(Ini.ReadString('Server','Login',''));
+     self.sServeName:= Trim( Ini.ReadString('Server','ServerName',''));
+
+   self.edLogin.Text:=self.sLogin;
+   self.edPassword.Text:='111'; //убрать после дебага
+
+   Ini.Free;
 end;
 
 end.

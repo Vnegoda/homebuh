@@ -1,0 +1,42 @@
+unit unInsUpdSprValut;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, cxGraphics, cxControls, cxLookAndFeels,
+  cxLookAndFeelPainters, cxContainer, cxEdit, cxTextEdit, cxLabel, Vcl.Menus,
+  Vcl.StdCtrls, cxButtons;
+
+type
+  TfmInsUpdSprValut = class(TForm)
+    cxLabel1: TcxLabel;
+    cxLabel2: TcxLabel;
+    cxLabel3: TcxLabel;
+    cxedAbbr: TcxTextEdit;
+    cxedShortName: TcxTextEdit;
+    cxedName: TcxTextEdit;
+    cxButton1: TcxButton;
+    cxButton2: TcxButton;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    procedure fillform;
+  end;
+
+var
+  fmInsUpdSprValut: TfmInsUpdSprValut;
+
+implementation
+
+{$R *.dfm}
+
+procedure TfmInsUpdSprValut.fillform;
+begin
+  self.cxedAbbr.Clear;
+  self.cxedShortName.Clear;
+  self.cxedName.Clear;
+end;
+
+end.

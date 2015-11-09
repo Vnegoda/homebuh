@@ -1,0 +1,15 @@
+object dmOra: TdmOra
+  OldCreateOrder = False
+  Height = 150
+  Width = 215
+  object OraSession: TOraSession
+    Username = 'test'
+    Server = 'testoracle'
+    Connected = True
+    LoginPrompt = False
+    Schema = 'test'
+    Left = 32
+    Top = 32
+    EncryptedPassword = '8BFF9AFF8CFF8BFF'
+  end
+end
