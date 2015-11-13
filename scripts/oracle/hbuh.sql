@@ -1,10 +1,52 @@
-------------------------------------------
--- Export file for user HBUH            --
--- Created by m on 08.11.2015, 23:17:33 --
-------------------------------------------
+--------------------------------------------
+-- Export file for user HBUH              --
+-- Created by Vova on 14.11.2015, 0:29:15 --
+--------------------------------------------
 
 set define off
 spool hbuh.log
+
+prompt
+prompt Creating table OPERATION
+prompt ========================
+prompt
+create table HBUH.OPERATION
+(
+  id             NUMBER not null,
+  id_user        NUMBER not null,
+  id_count_begin NUMBER not null,
+  id_count_end   NUMBER not null,
+  summa_begin    NUMBER(10,3),
+  summ_end       NUMBER(10,3),
+  id_kateg       NUMBER not null
+)
+tablespace HBUH
+  pctfree 10
+  initrans 1
+  maxtrans 255
+  storage
+  (
+    initial 64K
+    minextents 1
+    maxextents unlimited
+  );
+comment on column HBUH.OPERATION.id_count_begin
+  is 'счет с которого взяли деньги';
+comment on column HBUH.OPERATION.id_count_end
+  is 'счет на который попали деньги(например при конвертации или когда сдача в другой валюте) ';
+comment on column HBUH.OPERATION.summa_begin
+  is 'сумма со счета источника снимаемая';
+comment on column HBUH.OPERATION.summ_end
+  is 'сумма на счет получатель добавленная';
+comment on column HBUH.OPERATION.id_kateg
+  is 'тип операции';
+alter table HBUH.OPERATION
+  add constraint KEY_ID_OPER unique (ID)
+  using index 
+  tablespace HBUH
+  pctfree 10
+  initrans 2
+  maxtrans 255;
 
 prompt
 prompt Creating table SPR_CATEGORY
@@ -164,6 +206,17 @@ alter table HBUH.SPR_KURS
   references HBUH.SPR_VALUT (ID);
 
 prompt
+prompt Creating sequence SEQ_OPERATION
+prompt ===============================
+prompt
+create sequence HBUH.SEQ_OPERATION
+minvalue 1
+maxvalue 9999999999
+start with 1
+increment by 1
+cache 20;
+
+prompt
 prompt Creating sequence SEQ_SPR_BUH_ID
 prompt ================================
 prompt
@@ -235,6 +288,425 @@ select id,cod,short_name,name
     from hbuh.spr_valut;
 
 prompt
+prompt Creating procedure SPR_COUNTS_DEL
+prompt =================================
+prompt
+create or replace procedure hbuh.spr_counts_del(v_id in number,
+                                           
+                                           v_nout out number,
+                                           v_sout out varchar2
+                                           
+                                           ) is
+  -- nva 2015.10.28
+  -- insert values in spr_valut
+begin
+  declare
+    v_cnt       number;
+    v_old_valut number;
+    is_empty_values exception;
+    is_null_values  exception;
+  
+    is_not_exist_counts exception;
+  
+    is_count_used exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id is null then
+      raise is_null_values;
+    end if;
+  
+    -- valit exist value
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_counts where id = v_id;
+    if v_cnt != 0 then
+      raise is_not_exist_counts;
+    end if;
+  
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.operation
+     where id_count_begin = v_id
+        or id_count_end = v_id;
+    if v_cnt > 0 then
+      raise is_count_used;
+    end if;
+  
+    -- insert values
+    delete from hbuh.spr_counts where id = v_id;
+  
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    
+    when is_not_exist_counts then
+      v_nout := -6;
+      v_sout := 'Не найден изменяемый счет. Операция не выполнена';
+      rollback;
+    when is_count_used then
+      v_nout := -7;
+      v_sout := 'По счет было движение, менять валюту нельзя. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end spr_counts_del;
+/
+
+prompt
+prompt Creating procedure SPR_COUNTS_INS
+prompt =================================
+prompt
+create or replace procedure hbuh.spr_counts_ins(v_id_user  in number,
+                                           v_name     in varchar2,
+                                           v_id_valut in number,
+                                           v_nout     out number,
+                                           v_sout     out varchar2
+                                           
+                                           ) is
+  -- nva 2015.10.28
+  -- insert values in spr_valut
+begin
+  declare
+    v_cnt number;
+    is_empty_values     exception;
+    is_null_values      exception;
+    is_dublicate_record exception;
+    is_not_exist_user   exception;
+    is_not_exist_valut  exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id_user is null then
+      raise is_null_values;
+    end if;
+  
+    if v_name is null then
+      raise is_null_values;
+    end if;
+  
+    if v_id_valut is null then
+      raise is_null_values;
+    end if;
+    -- valid empty
+    if v_id_user = 0 then
+      raise is_empty_values;
+    end if;
+  
+    if v_id_valut = 0 then
+      raise is_empty_values;
+    end if;
+  
+    if length(trim(v_name)) = 0 then
+      raise is_empty_values;
+    end if;
+    -- valit exist value
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt != 0 then
+      raise is_not_exist_user;
+    end if;
+    --
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valut;
+    if v_cnt != 0 then
+      raise is_not_exist_valut;
+    end if;
+  
+    -- valid dublicat
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_counts
+     where name = upper(v_name);
+    if v_cnt <> 0 then
+      raise is_dublicate_record;
+    end if;
+  
+    -- insert values
+    insert into hbuh.spr_counts
+      (id, id_user, name, id_valut)
+    values
+      (hbuh.seq_spr_counts.nextval,
+       v_id_user,
+       upper(trim(v_name)),
+       v_id_valut);
+  
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
+      rollback;
+    when is_not_exist_user then
+      v_nout := -4;
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
+      rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end spr_counts_ins;
+/
+
+prompt
+prompt Creating procedure SPR_COUNTS_UPD
+prompt =================================
+prompt
+create or replace procedure hbuh.spr_counts_upd(v_id       in number,
+                                           v_id_user  in number,
+                                           v_name     in varchar2,
+                                           v_id_valut in number,
+                                           v_nout     out number,
+                                           v_sout     out varchar2
+                                           
+                                           ) is
+  -- nva 2015.10.28
+  -- insert values in spr_valut
+begin
+  declare
+    v_cnt       number;
+    v_old_valut number;
+    is_empty_values     exception;
+    is_null_values      exception;
+    is_dublicate_record exception;
+    is_not_exist_user   exception;
+    is_not_exist_valut  exception;
+    is_not_exist_counts exception;
+  
+    is_count_used exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id is null then
+      raise is_null_values;
+    end if;
+  
+    if v_id_user is null then
+      raise is_null_values;
+    end if;
+  
+    if v_name is null then
+      raise is_null_values;
+    end if;
+  
+    if v_id_valut is null then
+      raise is_null_values;
+    end if;
+    -- valid empty
+    if v_id_user = 0 then
+      raise is_empty_values;
+    end if;
+  
+    if v_id_valut = 0 then
+      raise is_empty_values;
+    end if;
+  
+    if length(trim(v_name)) = 0 then
+      raise is_empty_values;
+    end if;
+    -- valit exist value
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_counts where id = v_id;
+    if v_cnt != 0 then
+      raise is_not_exist_counts;
+    end if;
+  
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt != 0 then
+      raise is_not_exist_user;
+    end if;
+    --
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valut;
+    if v_cnt != 0 then
+      raise is_not_exist_valut;
+    end if;
+  
+    -- valid dublicat
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_counts
+     where id != v_id
+       and name = upper(v_name);
+    if v_cnt <> 0 then
+      raise is_dublicate_record;
+    end if;
+    -- valid use count in opertaion
+    v_old_valut := 0;
+    select id_valut into v_old_valut from hbuh.spr_counts where id = v_id;
+    -- проверить, если валюта изменяется и есть движение по этому счету, 
+    -- то менять валюту счета нельзя
+    if v_id_valut != v_old_valut then
+      v_cnt := 0;
+      select count(1)
+        into v_cnt
+        from hbuh.operation
+       where id_count_begin = v_id
+          or id_count_end = v_id;
+      if v_cnt > 0 then
+        raise is_count_used;
+      end if;
+    end if;
+  
+    -- insert values
+    update hbuh.spr_counts
+       set id_user = v_id_user, name = upper(v_name), id_valut = v_id_valut
+     where id = v_id;
+  
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
+      rollback;
+    when is_not_exist_user then
+      v_nout := -4;
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
+      rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when is_not_exist_counts then
+      v_nout := -6;
+      v_sout := 'Не найден изменяемый счет. Операция не выполнена';
+      rollback;
+    when is_count_used then
+      v_nout := -7;
+      v_sout := 'По счет было движение, менять валюту нельзя. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end spr_counts_upd;
+/
+
+prompt
+prompt Creating procedure SPR_VALUT_DEL
+prompt ================================
+prompt
+create or replace procedure hbuh.spr_valut_del(v_id   in number,
+                                          v_nout out number,
+                                          v_sout out varchar2
+                                          
+                                          ) is
+  -- nva 2015.10.28
+  -- update values in spr_valut
+begin
+  declare
+    v_cnt number;
+  
+    is_used_spr_kurs   exception;
+    is_used_spr_counts exception;
+    is_no_valut        exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id;
+    if v_cnt != 0 then
+      raise is_no_valut;
+    end if;
+  
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_kurs
+     where id_valuta1 = v_id
+        or id_valuta2 = v_id;
+    if v_cnt != 0 then
+      raise is_used_spr_kurs;
+    end if;
+  
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_counts where id_valut = v_id;
+    if v_cnt != 0 then
+      raise is_used_spr_counts;
+    end if;
+  
+    -- delete values
+    delete from hbuh.spr_valut where id = v_id;
+  
+    commit;
+  
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+  
+    when is_used_spr_kurs then
+      v_nout := -2;
+      v_sout := 'Валюта используется в справочнике курсов. Удалять нельзя. Операция не выполнена';
+      rollback;
+    when is_used_spr_counts then
+      v_nout := -3;
+      v_sout := 'Валюта используется в справочнике счетов. Удалять нельзя. Операция не выполнена';
+      rollback;
+    when is_no_valut then
+      v_nout := -4;
+      v_sout := 'изменяемая запись не найдена. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end spr_valut_del;
+/
+
+prompt
 prompt Creating procedure SPR_VALUT_INS
 prompt ================================
 prompt
@@ -245,18 +717,18 @@ create or replace procedure hbuh.spr_valut_ins(v_cod        in varchar2,
                                           v_sout       out varchar2
                                           
                                           ) is
--- nva 2015.10.28
--- insert values in spr_valut
+  -- nva 2015.10.28
+  -- insert values in spr_valut
 begin
   declare
     v_cnt number;
-    is_empty_values exception;
-    is_null_values  exception;
+    is_empty_values     exception;
+    is_null_values      exception;
     is_dublicate_record exception;
   begin
-    v_cnt:=0;
+    v_cnt  := 0;
     v_nout := 0;
-    v_sout := '???????? ?? ?????????';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_cod is null then
@@ -283,35 +755,42 @@ begin
       raise is_empty_values;
     end if;
     -- valid dublicat
-    v_cnt:=0;
-    select  count(1) into v_cnt from hbuh.spr_valut 
-            where cod=upper(v_cod)
-                  or short_name=upper(v_short_name)
-                  or name = upper(v_name);
-    if v_cnt<>0 then
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_valut
+     where cod = upper(v_cod)
+        or short_name = upper(v_short_name)
+        or name = upper(v_name);
+    if v_cnt <> 0 then
       raise is_dublicate_record;
     end if;
-    
-  -- insert values 
+  
+    -- insert values
     insert into hbuh.spr_valut
       (id, cod, short_name, name)
     values
-      (hbuh.spr_buh_id.nextval, upper(trim(v_cod)), upper(trim(v_short_name)), upper(trim(v_name)));
+      (hbuh.seq_spr_buh_id.nextval,
+       upper(trim(v_cod)),
+       upper(trim(v_short_name)),
+       upper(trim(v_name)));
   
     commit;
+     v_nout := 1;
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
-      v_nout := 1;
-      v_sout := '???? ?????? ???????????? ?????????. ???????? ?? ?????????';
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
-      v_nout := 2;
-      v_sout := '???? ???????????? ????????? ?????????? null. ???????? ?? ?????????';
-      rollback;   
-         when is_dublicate_record then
-      v_nout := 3;
-      v_sout := '???????????? ??????. ???????? ?? ?????????';
-      rollback;  
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть валюты содержащие такой код, название илии обозначение. Операция не выполнена';
+      rollback;
     when others then
       v_nout := SQLCODe;
       v_sout := SUBSTR(SQLERRM, 1, 100);
@@ -321,23 +800,106 @@ end spr_valut_ins;
 /
 
 prompt
-prompt Creating procedure TESTEXC
-prompt ==========================
+prompt Creating procedure SPR_VALUT_UPD
+prompt ================================
 prompt
-create or replace procedure hbuh.testexc is
-
+create or replace procedure hbuh.spr_valut_upd(v_id         in number,
+                                          v_cod        in varchar2,
+                                          v_short_name in varchar2,
+                                          v_name       in varchar2,
+                                          v_nout       out number,
+                                          v_sout       out varchar2
+                                          
+                                          ) is
+  -- nva 2015.10.28
+  -- update values in spr_valut
 begin
-     DECLARE     err_num  number;
-      err_msg  CHAR(100);
-    begin
-
-               err_num := 1;
-                err_msg := '?????? ???';
+  declare
+    v_cnt number;
+    is_empty_values     exception;
+    is_null_values      exception;
+    is_dublicate_record exception;
+    is_no_valut         exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id;
+    if v_cnt != 0 then
+      raise is_no_valut;
+    end if;
+  
+    -- valid null
+    if v_cod is null then
+      raise is_null_values;
+    end if;
+  
+    if v_short_name is null then
+      raise is_null_values;
+    end if;
+  
+    if v_name is null then
+      raise is_null_values;
+    end if;
+    -- valid empty
+    if length(trim(v_cod)) = 0 then
+      raise is_empty_values;
+    end if;
+  
+    if length(trim(v_short_name)) = 0 then
+      raise is_empty_values;
+    end if;
+  
+    if length(trim(v_name)) = 0 then
+      raise is_empty_values;
+    end if;
+    -- valid dublicat
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_valut
+     where id!=v_id and (cod = upper(v_cod)
+        or short_name = upper(v_short_name)
+        or name = upper(v_name));
+    if v_cnt <> 0 then
+      raise is_dublicate_record;
+    end if;
+  
+    -- insert values
+    update hbuh.spr_valut set
+    cod=v_cod,
+    short_name=v_short_name,
+    name=v_name
+    where id=v_id;
     
-                 err_num := SQLCODe;
-                err_msg := SUBSTR(SQLERRM, 1, 100);
-    end;
-end testexc;
+    commit;
+     v_nout := 1;
+    v_sout := 'Операция выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть валюты содержащие такой код, название илии обозначение. Операция не выполнена';
+      rollback;
+    when is_no_valut then
+      v_nout := -4;
+      v_sout := 'изменяемая запись не найдена. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end spr_valut_upd;
 /
 
 
