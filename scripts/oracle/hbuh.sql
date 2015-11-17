@@ -1,6 +1,6 @@
 ---------------------------------------------
 -- Export file for user HBUH               --
--- Created by Vova on 17.11.2015, 15:20:12 --
+-- Created by Vova on 17.11.2015, 23:49:35 --
 ---------------------------------------------
 
 set define off
@@ -317,6 +317,361 @@ select id,cod,short_name,name
     from hbuh.spr_valut;
 
 prompt
+prompt Creating procedure MOVE_DEL
+prompt ===========================
+prompt
+create or replace procedure hbuh.move_del(v_id      in number,
+                                     v_id_user in number,
+                                     v_nout    out number,
+                                     v_sout    out varchar2
+                                     
+                                     ) is
+  -- last edit
+  -- nva 
+  -- 2015.11.17
+
+begin
+  declare
+    v_cnt             number;
+    v_id_count_src    number;
+    v_owner_count_src number; -- владелец счета источника
+  
+    is_not_exist_categ    exception;
+    is_not_your_count_src exception;
+    is_empty_values       exception;
+    is_null_values        exception;
+    is_dublicate_record   exception;
+    is_not_exist_user     exception;
+    is_not_exist_valut    exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id_user is null or v_id is null then
+      raise is_null_values;
+    end if;
+  
+    -- valid empty
+  
+    if v_id_user = 0 or v_id = 0 then
+      raise is_empty_values;
+    end if;
+    --
+    -- valit exist value
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt != 0 then
+      raise is_not_exist_user;
+    end if;
+    --
+  
+    v_id_count_src := 0;
+    select id_count_source
+      into v_id_count_src
+      from hbuh.move
+     where id = v_id;
+  
+    v_owner_count_src := 0;
+    select id_user
+      into v_owner_count_src
+      from hbuh.spr_counts
+     where id = v_id_count_src;
+    if v_owner_count_src != v_id_user then
+      -- it's necessary add full control for admin user
+      raise is_not_your_count_src;
+    end if;
+  
+    -- insert values
+    delete from hbuh.move where id = v_id;
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
+      rollback;
+    when is_not_exist_user then
+      v_nout := -4;
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
+      rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when is_not_your_count_src then
+      v_nout := -6;
+      v_sout := 'Нельзя делать переводы со счета, владельцем которого вы не являетесь. Операция не выполнена';
+      rollback;
+    when is_not_exist_categ then
+      v_nout := -7;
+      v_sout := 'Не найдена указанная категория. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end move_del;
+/
+
+prompt
+prompt Creating procedure MOVE_INS
+prompt ===========================
+prompt
+create or replace procedure hbuh.move_ins(v_id_user       in number,
+                                     v_id_count_src  in number,
+                                     v_id_count_dest in number,
+                                     v_summa_src     in number,
+                                     v_summa_dest    in number,
+                                     v_nout          out number,
+                                     v_sout          out varchar2
+                                     
+                                     ) is
+  -- last edit
+  -- nva 
+  -- 2015.11.17
+
+begin
+  declare
+    v_cnt             number;
+    v_owner_count_src number; -- владелец счета источника
+  
+    is_not_exist_categ    exception;
+    is_not_your_count_src exception;
+    is_empty_values       exception;
+    is_null_values        exception;
+    is_dublicate_record   exception;
+    is_not_exist_user     exception;
+    is_not_exist_valut    exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id_user is null or v_id_count_src is null or
+       v_id_count_src is null or v_summa_src is null or v_summa_src is null then
+      raise is_null_values;
+    end if;
+  
+    -- valid empty
+  
+    if v_id_user = 0 or v_id_count_src = 0 or v_id_count_src = 0 or
+       v_summa_src = 0 or v_summa_src = 0 then
+      raise is_empty_values;
+    end if;
+    --
+    v_owner_count_src := 0;
+    select id_user
+      into v_owner_count_src
+      from hbuh.spr_counts
+     where id = v_id_count_src;
+    if v_owner_count_src != v_id_user then
+      -- it's necessary add full control for admin user
+      raise is_not_your_count_src;
+    end if;
+  
+    -- valit exist value
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt != 0 then
+      raise is_not_exist_user;
+    end if;
+  
+    -- insert values
+    insert into hbuh.move
+      (id, id_count_source, id_count_dest, summa_source, summa_dest)
+    values
+      (seq_move.nextval,
+       v_id_count_src,
+       v_id_count_dest,
+       v_summa_src,
+       v_summa_dest);
+  
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
+      rollback;
+    when is_not_exist_user then
+      v_nout := -4;
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
+      rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when is_not_your_count_src then
+      v_nout := -6;
+      v_sout := 'Нельзя делать переводы со счета, владельцем которого вы не являетесь. Операция не выполнена';
+      rollback;
+    when is_not_exist_categ then
+      v_nout := -7;
+      v_sout := 'Не найдена указанная категория. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end move_ins;
+/
+
+prompt
+prompt Creating procedure MOVE_UPD
+prompt ===========================
+prompt
+create or replace procedure hbuh.move_upd(v_id            in number,
+                                     v_id_user       in number,
+                                     v_id_count_src  in number,
+                                     v_id_count_dest in number,
+                                     v_summa_src     in number,
+                                     v_summa_dest    in number,
+                                     v_nout          out number,
+                                     v_sout          out varchar2
+                                     
+                                     ) is
+  -- last edit
+  -- nva 
+  -- 2015.11.17
+
+begin
+  declare
+    v_cnt                 number;
+    v_owner_count_src     number; -- владелец счета источника
+    v_owner_count_src_old number;
+  
+    is_not_exist_categ    exception;
+    is_not_your_count_src exception;
+    is_empty_values       exception;
+    is_null_values        exception;
+    is_dublicate_record   exception;
+    is_not_exist_user     exception;
+    is_not_exist_valut    exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id_user is null or v_id_count_src is null or
+       v_id_count_src is null or v_summa_src is null or v_summa_src is null then
+      raise is_null_values;
+    end if;
+  
+    -- valid empty
+  
+    if v_id_user = 0 or v_id_count_src = 0 or v_id_count_src = 0 or
+       v_summa_src = 0 or v_summa_src = 0 then
+      raise is_empty_values;
+    end if;
+    --
+    -- проверка чтоб не поменяли перевод с чужего счета на перевод со своего счета
+    -- определить какой счет был
+    -- потом в справочнике счетов определить владельца
+    -- потом сравнить владельца счета и текущего пользователся
+    v_owner_count_src_old := 0;
+    select id_count_source
+      into v_owner_count_src_old
+      from hbuh.move
+     where id = v_id;
+    select id_user
+      into v_owner_count_src
+      from hbuh.spr_counts
+     where id = v_owner_count_src_old;
+    if v_owner_count_src != v_id_user then
+      -- it's necessary add full control for admin user
+      raise is_not_your_count_src;
+    end if;
+  
+    v_owner_count_src := 0;
+    select id_user
+      into v_owner_count_src
+      from hbuh.spr_counts
+     where id = v_id_count_src;
+    if v_owner_count_src != v_id_user then
+      -- it's necessary add full control for admin user
+      raise is_not_your_count_src;
+    end if;
+  
+    -- valit exist value
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt != 0 then
+      raise is_not_exist_user;
+    end if;
+  
+    -- insert values
+    update hbuh.move
+       set id_count_source = v_id_count_src,
+           id_count_dest   = v_id_count_dest,
+           summa_source    = v_summa_src,
+           summa_dest      = v_summa_dest
+     where id = v_id;
+  
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
+      rollback;
+    when is_not_exist_user then
+      v_nout := -4;
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
+      rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when is_not_your_count_src then
+      v_nout := -6;
+      v_sout := 'Нельзя делать переводы со счета, владельцем которого вы не являетесь. Операция не выполнена';
+      rollback;
+    when is_not_exist_categ then
+      v_nout := -7;
+      v_sout := 'Не найдена указанная категория. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end move_upd;
+/
+
+prompt
 prompt Creating procedure OPERATION_DEL
 prompt ================================
 prompt
@@ -477,11 +832,11 @@ begin
     end if;
   
     v_owner_count := 0;
-    select id
+    select id_user
       into v_owner_count
       from hbuh.spr_counts
      where id = v_id_count;
-    if v_owner_count != v_id_count then
+    if v_owner_count != v_id_user then
       -- it's necessary add full control for admin user
       raise is_not_your_count;
     end if;
@@ -597,11 +952,11 @@ begin
     end if;
   
     v_owner_count := 0;
-    select id
+    select id_user
       into v_owner_count
       from hbuh.spr_counts
      where id = v_id_count;
-    if v_owner_count != v_id_count then
+    if v_owner_count != v_id_user then
       -- it's necessary add full control for admin user
       raise is_not_your_count;
     end if;
@@ -1073,14 +1428,19 @@ begin
     end if;
   
     v_cnt := 0;
-    select count(1)
-      into v_cnt
-      from hbuh.operation
-     where id_count = v_id;
+    select count(1) into v_cnt from hbuh.operation where id_count = v_id;
     if v_cnt > 0 then
       raise is_count_used;
     end if;
-  
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.move
+     where id_count_source = v_id
+        or id_count_dest = v_id;
+    if v_cnt > 0 then
+      raise is_count_used;
+    end if;
     -- delete values
     delete from hbuh.spr_counts where id = v_id;
   
@@ -1322,10 +1682,17 @@ begin
     -- то менять валюту счета нельзя
     if v_id_valut != v_old_valut then
       v_cnt := 0;
+      select count(1) into v_cnt from hbuh.operation where id_count = v_id;
+      if v_cnt > 0 then
+        raise is_count_used;
+      end if;
+    
+      v_cnt := 0;
       select count(1)
         into v_cnt
-        from hbuh.operation
-       where id_count = v_id;
+        from hbuh.move
+       where id_count_source = v_id
+          or id_count_dest = v_id;
       if v_cnt > 0 then
         raise is_count_used;
       end if;
@@ -1366,7 +1733,7 @@ begin
       rollback;
     when is_count_used then
       v_nout := -7;
-      v_sout := 'По счет было движение, менять валюту нельзя. Операция не выполнена';
+      v_sout := 'По счету было движение, менять валюту нельзя. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
