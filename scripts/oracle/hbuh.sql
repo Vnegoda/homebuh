@@ -1,24 +1,22 @@
---------------------------------------------
--- Export file for user HBUH              --
--- Created by Vova on 17.11.2015, 0:12:06 --
---------------------------------------------
- 
+---------------------------------------------
+-- Export file for user HBUH               --
+-- Created by Vova on 17.11.2015, 15:20:12 --
+---------------------------------------------
+
 set define off
 spool hbuh.log
 
 prompt
-prompt Creating table OPERATION
-prompt ========================
+prompt Creating table MOVE
+prompt ===================
 prompt
-create table HBUH.OPERATION
+create table HBUH.MOVE
 (
-  id             NUMBER not null,
-  id_user        NUMBER not null,
-  id_count_begin NUMBER not null,
-  id_count_end   NUMBER not null,
-  summa_begin    NUMBER(10,3),
-  summ_end       NUMBER(10,3),
-  id_categ       NUMBER not null
+  id              NUMBER not null,
+  id_count_source NUMBER not null,
+  id_count_dest   NUMBER not null,
+  summa_source    NUMBER(10,2) not null,
+  summa_dest      NUMBER(10,2) not null
 )
 tablespace HBUH
   pctfree 10
@@ -30,16 +28,36 @@ tablespace HBUH
     minextents 1
     maxextents unlimited
   );
-comment on column HBUH.OPERATION.id_count_begin
-  is 'СЃС‡РµС‚ СЃ РєРѕС‚РѕСЂРѕРіРѕ РІР·СЏР»Рё РґРµРЅСЊРіРё';
-comment on column HBUH.OPERATION.id_count_end
-  is 'СЃС‡РµС‚ РЅР° РєРѕС‚РѕСЂС‹Р№ РїРѕРїР°Р»Рё РґРµРЅСЊРіРё(РЅР°РїСЂРёРјРµСЂ РїСЂРё РєРѕРЅРІРµСЂС‚Р°С†РёРё РёР»Рё РєРѕРіРґР° СЃРґР°С‡Р° РІ РґСЂСѓРіРѕР№ РІР°Р»СЋС‚Рµ) ';
-comment on column HBUH.OPERATION.summa_begin
-  is 'СЃСѓРјРјР° СЃРѕ СЃС‡РµС‚Р° РёСЃС‚РѕС‡РЅРёРєР° СЃРЅРёРјР°РµРјР°СЏ';
-comment on column HBUH.OPERATION.summ_end
-  is 'СЃСѓРјРјР° РЅР° СЃС‡РµС‚ РїРѕР»СѓС‡Р°С‚РµР»СЊ РґРѕР±Р°РІР»РµРЅРЅР°СЏ';
-comment on column HBUH.OPERATION.id_categ
-  is 'С‚РёРї РѕРїРµСЂР°С†РёРё';
+alter table HBUH.MOVE
+  add constraint KEY_ID_MOVE unique (ID)
+  using index 
+  tablespace HBUH
+  pctfree 10
+  initrans 2
+  maxtrans 255;
+
+prompt
+prompt Creating table OPERATION
+prompt ========================
+prompt
+create table HBUH.OPERATION
+(
+  id       NUMBER not null,
+  id_user  NUMBER not null,
+  id_count NUMBER not null,
+  summa    NUMBER(10,3) not null,
+  id_categ NUMBER not null
+)
+tablespace HBUH
+  pctfree 10
+  initrans 1
+  maxtrans 255
+  storage
+  (
+    initial 64K
+    minextents 1
+    maxextents unlimited
+  );
 alter table HBUH.OPERATION
   add constraint KEY_ID_OPER unique (ID)
   using index 
@@ -206,6 +224,17 @@ alter table HBUH.SPR_KURS
   references HBUH.SPR_VALUT (ID);
 
 prompt
+prompt Creating sequence SEQ_MOVE
+prompt ==========================
+prompt
+create sequence HBUH.SEQ_MOVE
+minvalue 1
+maxvalue 999999999
+start with 1
+increment by 1
+cache 20;
+
+prompt
 prompt Creating sequence SEQ_OPERATION
 prompt ===============================
 prompt
@@ -288,27 +317,144 @@ select id,cod,short_name,name
     from hbuh.spr_valut;
 
 prompt
-prompt Creating procedure OPERATION_INS
+prompt Creating procedure OPERATION_DEL
 prompt ================================
 prompt
-create or replace procedure hbuh.operation_ins(v_id_user        in number,
-                                          v_id_count_begin in number,
-                                          v_id_count_end   in number,
-                                          v_summa_begin    in number,
-                                          v_summa_end      in number,
-                                          v_nout           out number,
-                                          v_sout           out varchar2
+create or replace procedure hbuh.operation_del(v_id      in number,
+                                          v_id_user in number,
+                                          v_nout    out number,
+                                          v_sout    out varchar2
                                           
                                           ) is
   -- last edit
   -- nva 
   -- 2015.11.17
-  -- insert values in operatioin
-  -- when operation MOVE: v_id_count_begin and v_id_count_end >0 and v_summa_begin and v_summa_end >0
-  -- other opertion v_id_count_begin and v_summa_begin>0, but v_summa_begin and v_summa_end =0 
+
 begin
   declare
-    v_cnt number;
+    v_cnt         number;
+    
+    v_owner_oper  number; -- owner opertion
+  
+    is_not_exist_operation exception;
+    is_not_exist_categ     exception;
+    is_not_your_count      exception;
+    is_not_your_oper       exception;
+    is_empty_values        exception;
+    is_null_values         exception;
+    is_dublicate_record    exception;
+    is_not_exist_user      exception;
+    is_not_exist_valut     exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id_user is null then
+      raise is_null_values;
+    end if;
+  
+    -- valid empty
+  
+    if v_id_user = 0 then
+      raise is_empty_values;
+    end if;
+  
+    v_owner_oper := 0;
+    select id_user into v_owner_oper from hbuh.operation where id = v_id;
+    if v_owner_oper != v_id_user then
+      -- it's necessary add full control for admin user
+      raise is_not_your_oper;
+    end if;
+    -- valit exist value
+  
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.operation where id = v_id;
+    if v_cnt != 0 then
+      raise is_not_exist_operation;
+    end if;
+  
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt != 0 then
+      raise is_not_exist_user;
+    end if;
+  
+    -- delete values
+    delete from hbuh.operation where id = v_id;
+  
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
+      rollback;
+    when is_not_exist_user then
+      v_nout := -4;
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
+      rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when is_not_your_count then
+      v_nout := -6;
+      v_sout := 'Нельзя вносить операции по счету владельцем которого вы не являетесь. Операция не выполнена';
+      rollback;
+    when is_not_exist_categ then
+      v_nout := -7;
+      v_sout := 'Не найдена указанная категория. Операция не выполнена';
+      rollback;
+    when is_not_exist_operation then
+      v_nout := -8;
+      v_sout := 'Не найдена указанная операция. Операция не выполнена';
+      rollback;
+    when is_not_your_oper then
+      v_nout := -8;
+      v_sout := 'Можно удалять только свои операции. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end operation_del;
+/
+
+prompt
+prompt Creating procedure OPERATION_INS
+prompt ================================
+prompt
+create or replace procedure hbuh.operation_ins(v_id_user  in number,
+                                          v_id_count in number,
+                                          v_summa    in number,
+                                          v_id_categ in number,
+                                          v_nout     out number,
+                                          v_sout     out varchar2
+                                          
+                                          ) is
+  -- last edit
+  -- nva 
+  -- 2015.11.17
+
+begin
+  declare
+    v_cnt         number;
+    v_owner_count number; -- владелец счета
+  
+    is_not_exist_categ  exception;
+    is_not_your_count   exception;
     is_empty_values     exception;
     is_null_values      exception;
     is_dublicate_record exception;
@@ -317,87 +463,82 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
-    if v_id_user is null then
+    if v_id_user is null or v_id_count is null or v_summa is null then
       raise is_null_values;
     end if;
   
-    if v_name is null then
-      raise is_null_values;
-    end if;
-  
-    if v_id_valut is null then
-      raise is_null_values;
-    end if;
     -- valid empty
-    if v_id_user = 0 then
+  
+    if v_id_user = 0 or v_id_count = 0 or v_summa = 0 then
       raise is_empty_values;
     end if;
   
-    if v_id_valut = 0 then
-      raise is_empty_values;
+    v_owner_count := 0;
+    select id
+      into v_owner_count
+      from hbuh.spr_counts
+     where id = v_id_count;
+    if v_owner_count != v_id_count then
+      -- it's necessary add full control for admin user
+      raise is_not_your_count;
     end if;
   
-    if length(trim(v_name)) = 0 then
-      raise is_empty_values;
-    end if;
     -- valit exist value
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
     if v_cnt != 0 then
       raise is_not_exist_user;
     end if;
-    --
-    v_cnt := 0;
-    select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valut;
-    if v_cnt != 0 then
-      raise is_not_exist_valut;
-    end if;
   
-    -- valid dublicat
     v_cnt := 0;
     select count(1)
       into v_cnt
-      from hbuh.spr_counts
-     where name = upper(v_name);
-    if v_cnt <> 0 then
-      raise is_dublicate_record;
+      from hbuh.spr_category
+     where id = v_id_categ;
+    if v_cnt != 0 then
+      raise is_not_exist_categ;
     end if;
   
     -- insert values
-    insert into hbuh.spr_counts
-      (id, id_user, name, id_valut)
+    insert into hbuh.operation
+      (id, id_user, id_count, summa, id_categ)
     values
-      (hbuh.seq_spr_counts.nextval,
-       v_id_user,
-       upper(trim(v_name)),
-       v_id_valut);
+      (seq_operation.nextval, v_id_user, v_id_count, v_summa, v_id_categ);
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ СЃС‡РµС‚ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
       rollback;
     when is_not_exist_user then
       v_nout := -4;
-      v_sout := 'Р—Р°РґР°РЅРЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
       rollback;
     when is_not_exist_valut then
       v_nout := -5;
-      v_sout := 'Р—Р°РґР°РЅРЅР°СЏ РІР°Р»СЋС‚Р° РЅРµ РЅР°Р№РґРµРЅР°. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when is_not_your_count then
+      v_nout := -6;
+      v_sout := 'Нельзя вносить операции по счету владельцем которого вы не являетесь. Операция не выполнена';
+      rollback;
+    when is_not_exist_categ then
+      v_nout := -7;
+      v_sout := 'Не найдена указанная категория. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -405,6 +546,149 @@ begin
       rollback;
   end;
 end operation_ins;
+/
+
+prompt
+prompt Creating procedure OPERATION_UPD
+prompt ================================
+prompt
+create or replace procedure hbuh.operation_upd(v_id       in number,
+                                          v_id_user  in number,
+                                          v_id_count in number,
+                                          v_summa    in number,
+                                          v_id_categ in number,
+                                          v_nout     out number,
+                                          v_sout     out varchar2
+                                          
+                                          ) is
+  -- last edit
+  -- nva 
+  -- 2015.11.17
+
+begin
+  declare
+    v_cnt         number;
+    v_owner_count number; -- owner count
+    v_owner_oper  number; -- owner opertion
+  
+    is_not_exist_operation exception;
+    is_not_exist_categ     exception;
+    is_not_your_count      exception;
+    is_not_your_oper       exception;
+    is_empty_values        exception;
+    is_null_values         exception;
+    is_dublicate_record    exception;
+    is_not_exist_user      exception;
+    is_not_exist_valut     exception;
+  begin
+    v_cnt  := 0;
+    v_nout := 0;
+    v_sout := 'Операция не выполнена';
+    ----------- valid input values
+    -- valid null
+    if v_id_user is null or v_id_count is null or v_summa is null then
+      raise is_null_values;
+    end if;
+  
+    -- valid empty
+  
+    if v_id_user = 0 or v_id_count = 0 or v_summa = 0 then
+      raise is_empty_values;
+    end if;
+  
+    v_owner_count := 0;
+    select id
+      into v_owner_count
+      from hbuh.spr_counts
+     where id = v_id_count;
+    if v_owner_count != v_id_count then
+      -- it's necessary add full control for admin user
+      raise is_not_your_count;
+    end if;
+  
+    v_owner_oper := 0;
+    select id_user into v_owner_oper from hbuh.operation where id = v_id;
+    if v_owner_oper != v_id_user then
+      -- it's necessary add full control for admin user
+      raise is_not_your_oper;
+    end if;
+    -- valit exist value
+  
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.operation where id = v_id;
+    if v_cnt != 0 then
+      raise is_not_exist_operation;
+    end if;
+  
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt != 0 then
+      raise is_not_exist_user;
+    end if;
+  
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_category
+     where id = v_id_categ;
+    if v_cnt != 0 then
+      raise is_not_exist_categ;
+    end if;
+  
+    -- insert values
+    update hbuh.operation
+       set id_user  = v_id_user,
+           id_count = v_id_count,
+           summa    = v_summa,
+           id_categ = v_id_categ
+     where id = v_id;
+  
+    commit;
+    v_nout := 1;
+    v_sout := 'Операция  выполнена';
+  exception
+    when is_empty_values then
+      v_nout := -1;
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
+      rollback;
+    when is_null_values then
+      v_nout := -2;
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
+      rollback;
+    when is_dublicate_record then
+      v_nout := -3;
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
+      rollback;
+    when is_not_exist_user then
+      v_nout := -4;
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
+      rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
+      rollback;
+    when is_not_your_count then
+      v_nout := -6;
+      v_sout := 'Нельзя вносить операции по счету владельцем которого вы не являетесь. Операция не выполнена';
+      rollback;
+    when is_not_exist_categ then
+      v_nout := -7;
+      v_sout := 'Не найдена указанная категория. Операция не выполнена';
+      rollback;
+    when is_not_exist_operation then
+      v_nout := -8;
+      v_sout := 'Не найдена указанная операция. Операция не выполнена';
+      rollback;
+    when is_not_your_oper then
+      v_nout := -8;
+      v_sout := 'Можно изменять только свои операции. Операция не выполнена';
+      rollback;
+    when others then
+      v_nout := SQLCODe;
+      v_sout := SUBSTR(SQLERRM, 1, 100);
+      rollback;
+  end;
+end operation_upd;
 /
 
 prompt
@@ -432,7 +716,7 @@ begin
     v_id_parent := 0;
     v_cnt       := 0;
     v_nout      := 0;
-    v_sout      := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout      := 'Операция не выполнена';
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_category where id = v_id;
@@ -461,16 +745,16 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_not_exist_category then
       v_nout := -7;
-      v_sout := 'РР·РјРµРЅСЏРµРјР°СЏ РєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Изменяемая категория не найдена. Операция не выполнена';
       rollback;
     
     when is_categ_used then
       v_nout := -8;
-      v_sout := 'РџРѕ РґР°РЅРЅРѕР№ РєР°С‚РµРіРѕСЂРёРё СѓР¶Рµ Р±С‹Р»Рё РґРІРёР¶РµРЅРёСЏ, СѓРґР°Р»СЏС‚СЊ РЅРµР»СЊР·СЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'По данной категории уже были движения, удалять нельзя. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -505,7 +789,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_id_parent is null or v_is_rashod is null or v_name is null then
@@ -565,31 +849,31 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ С‚Р°РєР°СЏ РєР°С‚РµРіРѕСЂРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть такая категория. Операция не выполнена';
       rollback;
     when is_not_correct_values then
       v_nout := -4;
-      v_sout := 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РїСЂРёР·РЅР°Рє РѕРїРµСЂР°С†РёРё (РґРѕС…РѕРґ/СЂР°СЃС…РѕРґ). РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Некорректный признак операции (доход/расход). Операция не выполнена';
       rollback;
     when is_not_exist_parent then
       v_nout := -5;
-      v_sout := 'РќРµ РЅР°Р№РґРµРЅР° СЂРѕРґРёС‚РµР»СЊСЃРєР°СЏ РєР°С‚РµРіРѕСЂРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Не найдена родительская категория. Операция не выполнена';
       rollback;
     when is_dublicate_name then
       v_nout := -6;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ РєР°С‚РµРіРѕСЂРёСЏ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть категория с таким названием. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -629,7 +913,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_category where id = v_id;
@@ -707,39 +991,39 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ С‚Р°РєР°СЏ РєР°С‚РµРіРѕСЂРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть такая категория. Операция не выполнена';
       rollback;
     when is_not_correct_values then
       v_nout := -4;
-      v_sout := 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РїСЂРёР·РЅР°Рє РѕРїРµСЂР°С†РёРё (РґРѕС…РѕРґ/СЂР°СЃС…РѕРґ). РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Некорректный признак операции (доход/расход). Операция не выполнена';
       rollback;
     when is_not_exist_parent then
       v_nout := -5;
-      v_sout := 'РќРµ РЅР°Р№РґРµРЅР° СЂРѕРґРёС‚РµР»СЊСЃРєР°СЏ РєР°С‚РµРіРѕСЂРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Не найдена родительская категория. Операция не выполнена';
       rollback;
     when is_dublicate_name then
       v_nout := -6;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ РєР°С‚РµРіРѕСЂРёСЏ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть категория с таким названием. Операция не выполнена';
       rollback;
     when is_not_exist_category then
       v_nout := -7;
-      v_sout := 'РР·РјРµРЅСЏРµРјР°СЏ РєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Изменяемая категория не найдена. Операция не выполнена';
       rollback;
     when cant_edit_flag_rashod then
       v_nout := -8;
-      v_sout := 'РџРѕ РґР°РЅРЅРѕР№ РєР°С‚РµРіРѕСЂРёРё СѓР¶Рµ Р±С‹Р»Рё РґРІРёР¶РµРЅРёСЏ, РёР·РјРµРЅСЏС‚СЊ РїСЂРёР·РЅР°Рє СЂР°СЃС…РѕРґР° РЅРµР»СЊР·СЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'По данной категории уже были движения, изменять признак расхода нельзя. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -774,7 +1058,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_id is null then
@@ -792,8 +1076,7 @@ begin
     select count(1)
       into v_cnt
       from hbuh.operation
-     where id_count_begin = v_id
-        or id_count_end = v_id;
+     where id_count = v_id;
     if v_cnt > 0 then
       raise is_count_used;
     end if;
@@ -803,24 +1086,24 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     
     when is_not_exist_counts then
       v_nout := -6;
-      v_sout := 'РќРµ РЅР°Р№РґРµРЅ РёР·РјРµРЅСЏРµРјС‹Р№ СЃС‡РµС‚. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Не найден изменяемый счет. Операция не выполнена';
       rollback;
     when is_count_used then
       v_nout := -7;
-      v_sout := 'РџРѕ СЃС‡РµС‚ Р±С‹Р»Рѕ РґРІРёР¶РµРЅРёРµ, РјРµРЅСЏС‚СЊ РІР°Р»СЋС‚Сѓ РЅРµР»СЊР·СЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'По счет было движение, менять валюту нельзя. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -854,7 +1137,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_id_user is null then
@@ -914,27 +1197,27 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ СЃС‡РµС‚ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
       rollback;
     when is_not_exist_user then
       v_nout := -4;
-      v_sout := 'Р—Р°РґР°РЅРЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
       rollback;
     when is_not_exist_valut then
       v_nout := -5;
-      v_sout := 'Р—Р°РґР°РЅРЅР°СЏ РІР°Р»СЋС‚Р° РЅРµ РЅР°Р№РґРµРЅР°. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -973,7 +1256,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_id is null then
@@ -1035,15 +1318,14 @@ begin
     -- valid use count in opertaion
     v_old_valut := 0;
     select id_valut into v_old_valut from hbuh.spr_counts where id = v_id;
-    -- РїСЂРѕРІРµСЂРёС‚СЊ, РµСЃР»Рё РІР°Р»СЋС‚Р° РёР·РјРµРЅСЏРµС‚СЃСЏ Рё РµСЃС‚СЊ РґРІРёР¶РµРЅРёРµ РїРѕ СЌС‚РѕРјСѓ СЃС‡РµС‚Сѓ, 
-    -- С‚Рѕ РјРµРЅСЏС‚СЊ РІР°Р»СЋС‚Сѓ СЃС‡РµС‚Р° РЅРµР»СЊР·СЏ
+    -- проверить, если валюта изменяется и есть движение по этому счету, 
+    -- то менять валюту счета нельзя
     if v_id_valut != v_old_valut then
       v_cnt := 0;
       select count(1)
         into v_cnt
         from hbuh.operation
-       where id_count_begin = v_id
-          or id_count_end = v_id;
+       where id_count = v_id;
       if v_cnt > 0 then
         raise is_count_used;
       end if;
@@ -1056,35 +1338,35 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ СЃС‡РµС‚ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть счет с таким названием. Операция не выполнена';
       rollback;
     when is_not_exist_user then
       v_nout := -4;
-      v_sout := 'Р—Р°РґР°РЅРЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Заданный пользователь не найден. Операция не выполнена';
       rollback;
     when is_not_exist_valut then
       v_nout := -5;
-      v_sout := 'Р—Р°РґР°РЅРЅР°СЏ РІР°Р»СЋС‚Р° РЅРµ РЅР°Р№РґРµРЅР°. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Заданная валюта не найдена. Операция не выполнена';
       rollback;
     when is_not_exist_counts then
       v_nout := -6;
-      v_sout := 'РќРµ РЅР°Р№РґРµРЅ РёР·РјРµРЅСЏРµРјС‹Р№ СЃС‡РµС‚. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Не найден изменяемый счет. Операция не выполнена';
       rollback;
     when is_count_used then
       v_nout := -7;
-      v_sout := 'РџРѕ СЃС‡РµС‚ Р±С‹Р»Рѕ РґРІРёР¶РµРЅРёРµ, РјРµРЅСЏС‚СЊ РІР°Р»СЋС‚Сѓ РЅРµР»СЊР·СЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'По счет было движение, менять валюту нельзя. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -1115,7 +1397,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_id is null then
@@ -1139,20 +1421,20 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     
     when is_not_exists then
       v_nout := -4;
-      v_sout := 'РЈРґР°Р»СЏРµРјС‹Рµ РґР°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹. РћРїРµСЂР°С†РёСЏ РѕС‚РјРµРЅРµРЅР°';
+      v_sout := 'Удаляемые данные не найдены. Операция отменена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -1186,7 +1468,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_date is null or v_id_valuta1 is null or v_id_valuta2 is null or
@@ -1225,19 +1507,19 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РќР° СЌС‚Сѓ РґР°С‚Сѓ РґР»СЏ СЌС‚РёС… РІР°Р»СЋС‚ СѓР¶Рµ РµСЃС‚СЊ Р·Р°РґР°РЅРЅС‹Р№ РєСѓСЂСЃ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'На эту дату для этих валют уже есть заданный курс. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -1274,7 +1556,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_date is null or v_id_valuta1 is null or v_id_valuta2 is null or
@@ -1319,23 +1601,23 @@ begin
   
     commit;
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РќР° СЌС‚Сѓ РґР°С‚Сѓ РґР»СЏ СЌС‚РёС… РІР°Р»СЋС‚ СѓР¶Рµ РµСЃС‚СЊ Р·Р°РґР°РЅРЅС‹Р№ РєСѓСЂСЃ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'На эту дату для этих валют уже есть заданный курс. Операция не выполнена';
       rollback;
     when is_not_exists then
       v_nout := -4;
-      v_sout := 'Р РµРґР°РєС‚РёСЂСѓРµРјС‹Рµ РґР°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹. РћРїРµСЂР°С†РёСЏ РѕС‚РјРµРЅРµРЅР°';
+      v_sout := 'Редактируемые данные не найдены. Операция отменена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -1366,7 +1648,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_valut where id = v_id;
@@ -1396,20 +1678,20 @@ begin
     commit;
   
     v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
   
     when is_used_spr_kurs then
       v_nout := -2;
-      v_sout := 'Р’Р°Р»СЋС‚Р° РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ СЃРїСЂР°РІРѕС‡РЅРёРєРµ РєСѓСЂСЃРѕРІ. РЈРґР°Р»СЏС‚СЊ РЅРµР»СЊР·СЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Валюта используется в справочнике курсов. Удалять нельзя. Операция не выполнена';
       rollback;
     when is_used_spr_counts then
       v_nout := -3;
-      v_sout := 'Р’Р°Р»СЋС‚Р° РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ СЃРїСЂР°РІРѕС‡РЅРёРєРµ СЃС‡РµС‚РѕРІ. РЈРґР°Р»СЏС‚СЊ РЅРµР»СЊР·СЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Валюта используется в справочнике счетов. Удалять нельзя. Операция не выполнена';
       rollback;
     when is_no_valut then
       v_nout := -4;
-      v_sout := 'РёР·РјРµРЅСЏРµРјР°СЏ Р·Р°РїРёСЃСЊ РЅРµ РЅР°Р№РґРµРЅР°. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'изменяемая запись не найдена. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -1441,7 +1723,7 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
     if v_cod is null then
@@ -1490,19 +1772,19 @@ begin
   
     commit;
      v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ  РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция  выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ РІР°Р»СЋС‚С‹ СЃРѕРґРµСЂР¶Р°С‰РёРµ С‚Р°РєРѕР№ РєРѕРґ, РЅР°Р·РІР°РЅРёРµ РёР»РёРё РѕР±РѕР·РЅР°С‡РµРЅРёРµ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть валюты содержащие такой код, название илии обозначение. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -1522,7 +1804,7 @@ create or replace procedure hbuh.spr_valut_upd(v_id         in number,
                                           v_name       in varchar2,
                                           v_nout       out number,
                                           v_sout       out varchar2
-                                          
+
                                           ) is
   -- nva 2015.10.28
   -- update values in spr_valut
@@ -1536,23 +1818,23 @@ begin
   begin
     v_cnt  := 0;
     v_nout := 0;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция не выполнена';
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_valut where id = v_id;
     if v_cnt != 0 then
       raise is_no_valut;
     end if;
-  
+
     -- valid null
     if v_cod is null then
       raise is_null_values;
     end if;
-  
+
     if v_short_name is null then
       raise is_null_values;
     end if;
-  
+
     if v_name is null then
       raise is_null_values;
     end if;
@@ -1560,11 +1842,11 @@ begin
     if length(trim(v_cod)) = 0 then
       raise is_empty_values;
     end if;
-  
+
     if length(trim(v_short_name)) = 0 then
       raise is_empty_values;
     end if;
-  
+
     if length(trim(v_name)) = 0 then
       raise is_empty_values;
     end if;
@@ -1579,33 +1861,33 @@ begin
     if v_cnt <> 0 then
       raise is_dublicate_record;
     end if;
-  
+
     -- insert values
     update hbuh.spr_valut set
     cod=v_cod,
     short_name=v_short_name,
     name=v_name
     where id=v_id;
-    
+
     commit;
      v_nout := 1;
-    v_sout := 'РћРїРµСЂР°С†РёСЏ РІС‹РїРѕР»РЅРµРЅР°';
+    v_sout := 'Операция выполнена';
   exception
     when is_empty_values then
       v_nout := -1;
-      v_sout := 'Р•СЃС‚СЊ РЅРµР·Р°РїРѕР»РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть незаполненные значения. Операция не выполнена';
       rollback;
     when is_null_values then
       v_nout := -2;
-      v_sout := 'Р•СЃС‚СЊ РїРѕР»СЏ СЃРѕРґРµСЂР¶Р°С‰РёРµ Р·РЅР°С‡РµРЅРёРµ null. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Есть поля содержащие значение null. Операция не выполнена';
       rollback;
     when is_dublicate_record then
       v_nout := -3;
-      v_sout := 'РЈР¶Рµ РµСЃС‚СЊ РІР°Р»СЋС‚С‹ СЃРѕРґРµСЂР¶Р°С‰РёРµ С‚Р°РєРѕР№ РєРѕРґ, РЅР°Р·РІР°РЅРёРµ РёР»РёРё РѕР±РѕР·РЅР°С‡РµРЅРёРµ. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'Уже есть валюты содержащие такой код, название илии обозначение. Операция не выполнена';
       rollback;
     when is_no_valut then
       v_nout := -4;
-      v_sout := 'РёР·РјРµРЅСЏРµРјР°СЏ Р·Р°РїРёСЃСЊ РЅРµ РЅР°Р№РґРµРЅР°. РћРїРµСЂР°С†РёСЏ РЅРµ РІС‹РїРѕР»РЅРµРЅР°';
+      v_sout := 'изменяемая запись не найдена. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
