@@ -1,0 +1,11 @@
+﻿[]
+Coordinates=195,164,53,51
+Visible=True
+ExplicitSubNodes=Brush.Handle
+
+[oraQFillParent]
+Coordinates=0,0,67,51
+
+[oraDSFillParent]
+Coordinates=176,87,111,58
+
