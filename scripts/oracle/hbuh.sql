@@ -1,6 +1,6 @@
 ---------------------------------------------
 -- Export file for user HBUH               --
--- Created by Vova on 19.11.2015, 22:34:58 --
+-- Created by Vova on 30.11.2015, 17:57:53 --
 ---------------------------------------------
 
 set define off
@@ -87,6 +87,7 @@ tablespace HBUH
   storage
   (
     initial 64K
+    next 1M
     minextents 1
     maxextents unlimited
   );
@@ -96,7 +97,14 @@ alter table HBUH.SPR_CATEGORY
   tablespace HBUH
   pctfree 10
   initrans 2
-  maxtrans 255;
+  maxtrans 255
+  storage
+  (
+    initial 64K
+    next 1M
+    minextents 1
+    maxextents unlimited
+  );
 
 prompt
 prompt Creating table SPR_VALUT
@@ -147,14 +155,28 @@ create table HBUH.USERS
 tablespace HBUH
   pctfree 10
   initrans 1
-  maxtrans 255;
+  maxtrans 255
+  storage
+  (
+    initial 64K
+    next 1M
+    minextents 1
+    maxextents unlimited
+  );
 alter table HBUH.USERS
   add constraint KEY_ID_USER unique (ID)
   using index 
   tablespace HBUH
   pctfree 10
   initrans 2
-  maxtrans 255;
+  maxtrans 255
+  storage
+  (
+    initial 64K
+    next 1M
+    minextents 1
+    maxextents unlimited
+  );
 
 prompt
 prompt Creating table SPR_COUNTS
@@ -164,8 +186,9 @@ create table HBUH.SPR_COUNTS
 (
   id       NUMBER not null,
   id_user  NUMBER not null,
-  name     NUMBER not null,
-  id_valut NUMBER not null
+  name     VARCHAR2(100) not null,
+  id_valut NUMBER not null,
+  comm     VARCHAR2(200) not null
 )
 tablespace HBUH
   pctfree 10
@@ -174,6 +197,7 @@ tablespace HBUH
   storage
   (
     initial 64K
+    next 1M
     minextents 1
     maxextents unlimited
   );
@@ -181,7 +205,14 @@ create index HBUH.KEY_ID_VALUT on HBUH.SPR_COUNTS (ID_VALUT)
   tablespace HBUH
   pctfree 10
   initrans 2
-  maxtrans 255;
+  maxtrans 255
+  storage
+  (
+    initial 64K
+    next 1M
+    minextents 1
+    maxextents unlimited
+  );
 alter table HBUH.SPR_COUNTS
   add constraint FK_ID_USER foreign key (ID_USER)
   references HBUH.USERS (ID);
@@ -255,7 +286,7 @@ prompt
 create sequence HBUH.SEQ_SPR_BUH_ID
 minvalue 1
 maxvalue 99999
-start with 1
+start with 61
 increment by 1
 cache 20;
 
@@ -266,7 +297,7 @@ prompt
 create sequence HBUH.SEQ_SPR_CATEGORY
 minvalue 1
 maxvalue 9999
-start with 1
+start with 21
 increment by 1
 cache 20;
 
@@ -277,7 +308,7 @@ prompt
 create sequence HBUH.SEQ_SPR_COUNTS
 minvalue 1
 maxvalue 999999
-start with 1
+start with 41
 increment by 1
 cache 20;
 
@@ -299,9 +330,20 @@ prompt
 create sequence HBUH.SEQ_SPR_USERS
 minvalue 1
 maxvalue 999999
-start with 1
+start with 21
 increment by 1
 cache 20;
+
+prompt
+prompt Creating view V_SPR_COUNT
+prompt =========================
+prompt
+create or replace force view hbuh.v_spr_count as
+select c.id,c.id_user,c.name,c.id_valut,c.comm,
+         u.name as username,
+         v.name as nameValut
+    from hbuh.spr_counts c left join hbuh.users u on c.id_user=u.id
+    left join hbuh.spr_valut v on c.id_valut=v.id;
 
 prompt
 prompt Creating view V_SPR_USER
@@ -316,8 +358,50 @@ prompt Creating view V_SPR_VALUT
 prompt =========================
 prompt
 create or replace force view hbuh.v_spr_valut as
-select id,cod,short_name,name
+select id,cod,short_name,name, cod||'('||short_name||') - '||name as full_name
     from hbuh.spr_valut;
+
+prompt
+prompt Creating function GETUSEDCATEGORY
+prompt =================================
+prompt
+create or replace function hbuh.getUsedCategory(v_idCateg      in number,
+                                           v_withSubCateg in number)
+  return number is
+  lbResult number(1);
+begin
+  declare
+    v_cnt number;
+  begin
+    lbResult := 0;
+  
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.operation
+     where id_categ = v_idCateg;
+    if v_cnt <> 0 then
+      lbResult := 1;
+    end if;
+    -- если эта категория не используется, и указано проверять подкатегории
+    -- то циклом проверяем подчиненные категории
+    -- проверка будет пока не найдется категория используемая в операция 
+    --или не будут проверены все категории
+    if lbResult = 0 and v_withSubCateg = 1 then
+      for cur in (select *
+                    from hbuh.spr_category
+                   where id_parent = v_idCateg) loop
+        lbResult := hbuh.getUsedCategory(cur.id, 1);
+        if lbResult = 1 then
+          exit;
+        end if;
+      end loop;
+    end if;
+  
+    return(lbResult);
+  end;
+end getUsedCategory;
+/
 
 prompt
 prompt Creating procedure MOVE_DEL
@@ -346,6 +430,7 @@ begin
     is_dublicate_record   exception;
     is_not_exist_user     exception;
     is_not_exist_valut    exception;
+     is_not_exist_move    exception;
   begin
     v_cnt  := 0;
     v_nout := 0;
@@ -362,13 +447,18 @@ begin
       raise is_empty_values;
     end if;
     --
-    -- valit exist value
+    -- valid exist value
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_user;
     end if;
     --
+       v_cnt := 0;
+    select count(1) into v_cnt from hbuh.move where id = v_id;
+    if v_cnt = 0 then
+      raise is_not_exist_move;
+    end if;
   
     v_id_count_src := 0;
     select id_count_source
@@ -419,6 +509,10 @@ begin
     when is_not_exist_categ then
       v_nout := -7;
       v_sout := 'Не найдена указанная категория. Операция не выполнена';
+      rollback;
+     when is_not_exist_move then
+        v_nout := -8;
+      v_sout := 'Не нацдена операция перемещения. Операция не выполнена';
       rollback;
     when others then
       v_nout := SQLCODe;
@@ -485,11 +579,28 @@ begin
       raise is_not_your_count_src;
     end if;
   
-    -- valit exist value
+    -- valid exist value
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_user;
+    end if;
+    -- valid exist counts
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_counts
+     where id = v_id_count_src;
+    if v_cnt = 0 then
+      raise is_not_exist_valut;
+    end if;
+    v_cnt := 0;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_counts
+     where id = v_id_count_dest;
+    if v_cnt = 0 then
+      raise is_not_exist_valut;
     end if;
   
     -- insert values
@@ -619,13 +730,23 @@ begin
       raise is_not_your_count_src;
     end if;
   
-    -- valit exist value
+    -- valid exist value
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_user;
     end if;
-  
+  -- valid exist counts
+  v_cnt:=0;
+  select count(1) into v_cnt from hbuh.spr_counts where id =  v_id_count_src;
+  if v_cnt = 0 then
+    raise is_not_exist_valut;
+  end if;
+  v_cnt:=0;
+  select count(1) into v_cnt from hbuh.spr_counts where id =  v_id_count_dest;
+  if v_cnt = 0 then
+    raise is_not_exist_valut;
+  end if; 
     -- insert values
     update hbuh.move
        set id_count_source = v_id_count_src,
@@ -729,13 +850,13 @@ begin
   
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.operation where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_operation;
     end if;
   
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_user;
     end if;
   
@@ -819,6 +940,7 @@ begin
     is_dublicate_record exception;
     is_not_exist_user   exception;
     is_not_exist_valut  exception;
+    is_not_exist_count exception;
   begin
     v_cnt  := 0;
     v_nout := 0;
@@ -834,7 +956,13 @@ begin
     if v_id_user = 0 or v_id_count = 0 or v_summa = 0 then
       raise is_empty_values;
     end if;
-  
+    -- valit exist value
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.users where id = v_id_user;
+    if v_cnt = 0 then
+      raise is_not_exist_user;
+    end if;
+    
     v_owner_count := 0;
     select id_user
       into v_owner_count
@@ -845,11 +973,13 @@ begin
       raise is_not_your_count;
     end if;
   
-    -- valit exist value
     v_cnt := 0;
-    select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
-      raise is_not_exist_user;
+    select count(1)
+      into v_cnt
+      from hbuh.spr_counts
+     where id = v_id_count;
+    if v_cnt = 0 then
+      raise is_not_exist_count;
     end if;
   
     v_cnt := 0;
@@ -857,7 +987,7 @@ begin
       into v_cnt
       from hbuh.spr_category
      where id = v_id_categ;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_categ;
     end if;
   
@@ -899,6 +1029,10 @@ begin
       v_nout := -7;
       v_sout := 'Не найдена указанная категория. Операция не выполнена';
       rollback;
+      when is_not_exist_count then
+            v_nout := -8;
+      v_sout := 'Не найден указанный счет. Операция не выполнена';
+      rollback; 
     when others then
       v_nout := SQLCODe;
       v_sout := SUBSTR(SQLERRM, 1, 100);
@@ -916,7 +1050,7 @@ create or replace procedure hbuh.operation_upd(v_id       in number,
                                           v_id_count in number,
                                           v_summa    in number,
                                           v_id_categ in number,
-                                          v_comment in varchar2,
+                                          v_comment  in varchar2,
                                           v_nout     out number,
                                           v_sout     out varchar2
                                           
@@ -940,6 +1074,7 @@ begin
     is_dublicate_record    exception;
     is_not_exist_user      exception;
     is_not_exist_valut     exception;
+    is_not_exist_count     exception;
   begin
     v_cnt  := 0;
     v_nout := 0;
@@ -954,6 +1089,12 @@ begin
   
     if v_id_user = 0 or v_id_count = 0 or v_summa = 0 then
       raise is_empty_values;
+    end if;
+  
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_counts where id = v_id_count;
+    if v_cnt = 0 then
+      raise is_not_exist_count;
     end if;
   
     v_owner_count := 0;
@@ -976,13 +1117,13 @@ begin
   
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.operation where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_operation;
     end if;
   
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_user;
     end if;
   
@@ -1001,7 +1142,7 @@ begin
            id_count = v_id_count,
            summa    = v_summa,
            id_categ = v_id_categ,
-           dest=v_comment
+           dest     = v_comment
      where id = v_id;
   
     commit;
@@ -1044,10 +1185,15 @@ begin
       v_nout := -8;
       v_sout := 'Можно изменять только свои операции. Операция не выполнена';
       rollback;
+    when is_not_exist_count then
+      v_nout := -9;
+      v_sout := 'Не найден указанный счет. Операция не выполнена';
+      rollback;
     when others then
       v_nout := SQLCODe;
       v_sout := SUBSTR(SQLERRM, 1, 100);
       rollback;
+    
   end;
 end operation_upd;
 /
@@ -1081,7 +1227,7 @@ begin
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_category where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_category;
     end if;
   
@@ -1158,9 +1304,7 @@ begin
     end if;
   
     -- valid empty
-    if v_id_parent = 0 then
-      raise is_empty_values;
-    end if;
+
   
     if length(trim(v_name)) = 0 then
       raise is_empty_values;
@@ -1175,7 +1319,7 @@ begin
         into v_cnt
         from hbuh.spr_category
        where id = v_id_parent;
-      if v_cnt <> 0 then
+      if v_cnt = 0 then
         raise is_not_exist_parent;
       end if;
     end if;
@@ -1278,7 +1422,7 @@ begin
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_category where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_category;
     end if;
   
@@ -1288,9 +1432,7 @@ begin
     end if;
   
     -- valid empty
-    if v_id_parent = 0 then
-      raise is_empty_values;
-    end if;
+
   
     if length(trim(v_name)) = 0 then
       raise is_empty_values;
@@ -1319,7 +1461,7 @@ begin
         into v_cnt
         from hbuh.spr_category
        where id = v_id_parent;
-      if v_cnt <> 0 then
+      if v_cnt = 0 then
         raise is_not_exist_parent;
       end if;
     end if;
@@ -1429,7 +1571,7 @@ begin
     -- valit exist value
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_counts where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_counts;
     end if;
   
@@ -1486,6 +1628,7 @@ prompt
 create or replace procedure hbuh.spr_counts_ins(v_id_user  in number,
                                            v_name     in varchar2,
                                            v_id_valut in number,
+                                            v_comment     in varchar2,
                                            v_nout     out number,
                                            v_sout     out varchar2
                                            
@@ -1506,7 +1649,7 @@ begin
     v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
-    if v_id_user is null then
+    if v_id_user is null or v_comment is null then
       raise is_null_values;
     end if;
   
@@ -1532,13 +1675,13 @@ begin
     -- valit exist value
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_user;
     end if;
     --
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valut;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_valut;
     end if;
   
@@ -1554,12 +1697,13 @@ begin
   
     -- insert values
     insert into hbuh.spr_counts
-      (id, id_user, name, id_valut)
+      (id, id_user, name, id_valut,comm)
     values
       (hbuh.seq_spr_counts.nextval,
        v_id_user,
        upper(trim(v_name)),
-       v_id_valut);
+       v_id_valut,
+       v_comment);
   
     commit;
     v_nout := 1;
@@ -1601,6 +1745,7 @@ create or replace procedure hbuh.spr_counts_upd(v_id       in number,
                                            v_id_user  in number,
                                            v_name     in varchar2,
                                            v_id_valut in number,
+                                           v_comment in varchar2,
                                            v_nout     out number,
                                            v_sout     out varchar2
                                            
@@ -1625,7 +1770,7 @@ begin
     v_sout := 'Операция не выполнена';
     ----------- valid input values
     -- valid null
-    if v_id is null then
+    if v_id is null or v_comment is null then
       raise is_null_values;
     end if;
   
@@ -1655,19 +1800,19 @@ begin
     -- valit exist value
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_counts where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_counts;
     end if;
   
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.users where id = v_id_user;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_user;
     end if;
     --
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valut;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_not_exist_valut;
     end if;
   
@@ -1706,7 +1851,8 @@ begin
   
     -- insert values
     update hbuh.spr_counts
-       set id_user = v_id_user, name = upper(v_name), id_valut = v_id_valut
+       set id_user = v_id_user, name = upper(v_name), id_valut = v_id_valut,
+       comm = v_comment
      where id = v_id;
   
     commit;
@@ -1838,6 +1984,7 @@ begin
     is_empty_values     exception;
     is_null_values      exception;
     is_dublicate_record exception;
+    is_not_exist_valut  exception;
   begin
     v_cnt  := 0;
     v_nout := 0;
@@ -1853,6 +2000,17 @@ begin
     if v_id_valuta1 = 0 or v_id_valuta2 = 0 or v_sum_valuta1 = 0 or
        v_sum_valuta1 = 0 then
       raise is_empty_values;
+    end if;
+    -- 
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valuta1;
+    if v_cnt = 0 then
+      raise is_not_exist_valut;
+    end if;
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valuta2;
+    if v_cnt = 0 then
+      raise is_not_exist_valut;
     end if;
   
     -- valid dublicat
@@ -1894,6 +2052,10 @@ begin
       v_nout := -3;
       v_sout := 'На эту дату для этих валют уже есть заданный курс. Операция не выполнена';
       rollback;
+    when is_not_exist_valut then
+      v_nout := -4;
+      v_sout := 'Валюта не найдена в справочнике. Операция не выполнена';
+      rollback;
     when others then
       v_nout := SQLCODe;
       v_sout := SUBSTR(SQLERRM, 1, 100);
@@ -1925,7 +2087,7 @@ begin
     is_null_values      exception;
     is_dublicate_record exception;
     is_not_exists       exception;
-  
+    is_not_exist_valut  exception;
   begin
     v_cnt  := 0;
     v_nout := 0;
@@ -1944,6 +2106,16 @@ begin
       raise is_not_exists;
     end if;
   
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valuta1;
+    if v_cnt = 0 then
+      raise is_not_exist_valut;
+    end if;
+    v_cnt := 0;
+    select count(1) into v_cnt from hbuh.spr_valut where id = v_id_valuta2;
+    if v_cnt = 0 then
+      raise is_not_exist_valut;
+    end if;
     -- valid empty
     if v_id_valuta1 = 0 or v_id_valuta2 = 0 or v_sum_valuta1 = 0 or
        v_sum_valuta1 = 0 or v_id = 0 then
@@ -1992,6 +2164,10 @@ begin
       v_nout := -4;
       v_sout := 'Редактируемые данные не найдены. Операция отменена';
       rollback;
+    when is_not_exist_valut then
+      v_nout := -5;
+      v_sout := 'Валюта не найдена в справочнике. Операция отменена';
+      rollback;
     when others then
       v_nout := SQLCODe;
       v_sout := SUBSTR(SQLERRM, 1, 100);
@@ -2025,7 +2201,7 @@ begin
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_valut where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_no_valut;
     end if;
   
@@ -2195,7 +2371,7 @@ begin
     ----------- valid input values
     v_cnt := 0;
     select count(1) into v_cnt from hbuh.spr_valut where id = v_id;
-    if v_cnt != 0 then
+    if v_cnt = 0 then
       raise is_no_valut;
     end if;
 
@@ -2237,9 +2413,9 @@ begin
 
     -- insert values
     update hbuh.spr_valut set
-    cod=v_cod,
-    short_name=v_short_name,
-    name=v_name
+    cod=upper(v_cod),
+    short_name=upper(v_short_name),
+    name=upper(v_name)
     where id=v_id;
 
     commit;

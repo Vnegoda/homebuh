@@ -1,22 +1,56 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.828,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.279,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.015,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.495,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.721,D:\!work\delphi\homebuh\Unit1.pas=D:\!work\delphi\homebuh\unSprValut.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.040,D:\!work\delphi\homebuh\Unit1.dfm=D:\!work\delphi\homebuh\unDM.dfm</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.505,D:\!work\delphi\homebuh\unInsUpdSprValut.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.793,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.721,D:\!work\delphi\homebuh\Unit1.dfm=D:\!work\delphi\homebuh\unSprValut.dfm</Transaction>
     <Transaction>1899.12.30 00:00:00.000.341,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.505,D:\!work\delphi\homebuh\Unit1.pas=D:\!work\delphi\homebuh\unInsUpdSprValut.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.368,D:\!work\delphi\homebuh\Unit1.pas=D:\!work\delphi\homebuh\unSprCountsInsUpd.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.901,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.015,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.573,D:\!work\delphi\homebuh\unSprCateg.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.721,D:\!work\delphi\homebuh\unSprValut.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.295,D:\!work\delphi\homebuh\unSprCategInsUpd.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.573,D:\!work\delphi\homebuh\unSprCateg.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.495,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.368,D:\!work\delphi\homebuh\Unit1.dfm=D:\!work\delphi\homebuh\unSprCountsInsUpd.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.505,D:\!work\delphi\homebuh\Unit1.dfm=D:\!work\delphi\homebuh\unInsUpdSprValut.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.756,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.847,D:\!work\delphi\homebuh\homeBuh.dproj=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Project1.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.721,D:\!work\delphi\homebuh\unSprValut.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
     <Transaction>1899.12.30 00:00:00.000.856,=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.412,C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.dfm=D:\!work\delphi\homebuh\unMain.dfm</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.412,C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas=D:\!work\delphi\homebuh\unMain.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.493,=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.295,D:\!work\delphi\homebuh\unSprCategInsUpd.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.412,D:\!work\delphi\homebuh\unMain.pas=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.899,=D:\!work\delphi\homebuh\unLoginForm.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.040,D:\!work\delphi\homebuh\Unit1.pas=D:\!work\delphi\homebuh\unDM.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.505,D:\!work\delphi\homebuh\unInsUpdSprValut.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.847,C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Project1.dproj=D:\!work\delphi\homebuh\homeBuh.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.040,D:\!work\delphi\homebuh\unDM.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.493,=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.066,D:\!work\delphi\homebuh\unSprCount.pas=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.412,D:\!work\delphi\homebuh\unMain.dfm=C:\Users\Vova\Documents\Embarcadero\Studio\Projects\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.068,=D:\!work\delphi\homebuh\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.996,D:\!work\delphi\homebuh\unSprCount.pas=D:\!work\delphi\homebuh\unSprCounts.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.996,D:\!work\delphi\homebuh\unSprCount.dfm=D:\!work\delphi\homebuh\unSprCounts.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.066,D:\!work\delphi\homebuh\unSprCount.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.040,D:\!work\delphi\homebuh\unDM.dfm=D:\!work\delphi\homebuh\Unit1.dfm</Transaction>
   </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="unDM.pas"/>
+    <File Path="unDM.dfm"/>
+    <File Path="unInsUpdSprValut.pas"/>
+    <File Path="unInsUpdSprValut.dfm"/>
+    <File Path="unLoginForm.pas"/>
+    <File Path="unLoginForm.dfm"/>
+    <File Path="unMain.pas"/>
+    <File Path="unMain.dfm"/>
+    <File Path="unSprCateg.pas"/>
+    <File Path="unSprCateg.dfm"/>
+    <File Path="unSprCategInsUpd.pas"/>
+    <File Path="unSprCategInsUpd.dfm"/>
+    <File Path="unSprCountsInsUpd.pas"/>
+    <File Path="unSprCountsInsUpd.dfm"/>
+    <File Path="unSprValut.pas"/>
+    <File Path="unSprValut.dfm"/>
+    <File Path="unSprCounts.pas"/>
+    <File Path="unSprCounts.dfm"/>
+  </ProjectSortOrder>
 </BorlandProject>

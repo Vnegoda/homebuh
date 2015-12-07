@@ -24,6 +24,8 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure actExitExecute(Sender: TObject);
     procedure actSprValutExecute(Sender: TObject);
+    procedure actSprCountsExecute(Sender: TObject);
+    procedure actSprKategExecute(Sender: TObject);
   private
     { Private declarations }
   public
@@ -37,12 +39,28 @@ implementation
 
 {$R *.dfm}
 
-uses unDM, unSprValut;
+uses unDM, unSprValut, unSprCounts, unSprCateg;
 
 procedure TfmMain.actExitExecute(Sender: TObject);
 begin
  dmOra.OraSession.Connected := false;
  Application.Terminate;
+end;
+
+procedure TfmMain.actSprCountsExecute(Sender: TObject);
+begin
+      if (not Assigned(fmSprValut)) then
+    fmSprCounts := TfmSprCounts.Create(Application);
+  fmSprCounts.fillForm;
+  fmSprCounts.Show;
+end;
+
+procedure TfmMain.actSprKategExecute(Sender: TObject);
+begin
+      if (not Assigned(fmSprValut)) then
+    fmSprCateg := TfmSprCateg.Create(Application);
+//  fmSprCateg.fillForm;
+  fmSprCateg.Show;
 end;
 
 procedure TfmMain.actSprValutExecute(Sender: TObject);

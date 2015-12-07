@@ -116,6 +116,7 @@ object fmMain: TfmMain
     object actSprCounts: TAction
       Category = #1057#1087#1088#1072#1074#1086#1095#1085#1080#1082#1080
       Caption = #1057#1087#1088#1072#1074#1086#1095#1085#1080#1082' '#1089#1095#1077#1090#1086#1074
+      OnExecute = actSprCountsExecute
     end
     object actSprValut: TAction
       Category = #1057#1087#1088#1072#1074#1086#1095#1085#1080#1082#1080
@@ -125,6 +126,7 @@ object fmMain: TfmMain
     object actSprKateg: TAction
       Category = #1057#1087#1088#1072#1074#1086#1095#1085#1080#1082#1080
       Caption = #1057#1087#1088#1072#1074#1086#1095#1085#1080#1082' '#1082#1072#1090#1077#1075#1086#1088#1080#1081
+      OnExecute = actSprKategExecute
     end
     object actOptions: TAction
       Category = #1053#1072#1089#1090#1088#1086#1081#1082#1080

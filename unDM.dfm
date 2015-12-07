@@ -6,6 +6,7 @@ object dmOra: TdmOra
     Username = 'hbuh'
     Server = 'TESTORACLE'
     AutoCommit = False
+    Connected = True
     LoginPrompt = False
     Left = 32
     Top = 32
