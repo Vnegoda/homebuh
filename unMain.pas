@@ -19,7 +19,6 @@ type
     actSprValut: TAction;
     actSprKateg: TAction;
     actOptions: TAction;
-    actKursValut: TAction;
     actUser: TAction;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure actExitExecute(Sender: TObject);

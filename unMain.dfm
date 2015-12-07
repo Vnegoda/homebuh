@@ -65,9 +65,6 @@ object fmMain: TfmMain
           item
             Items = <
               item
-                Action = actKursValut
-              end
-              item
                 Action = actSprCounts
               end
               item
@@ -108,10 +105,6 @@ object fmMain: TfmMain
     object actReportMonth: TAction
       Category = #1054#1090#1095#1077#1090#1099
       Caption = #1054#1090#1095#1077#1090#1099' '#1087#1086' '#1084#1077#1089#1103#1094#1072#1084
-    end
-    object actKursValut: TAction
-      Category = #1057#1087#1088#1072#1074#1086#1095#1085#1080#1082#1080
-      Caption = #1050#1091#1088#1089' '#1074#1072#1083#1102#1090
     end
     object actSprCounts: TAction
       Category = #1057#1087#1088#1072#1074#1086#1095#1085#1080#1082#1080
